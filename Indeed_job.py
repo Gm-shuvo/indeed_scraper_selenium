@@ -103,10 +103,10 @@ for link in links:
     except:
         job_dates.append("Not Found")
     try:
-        job_description = driver.find_element(
+        job_description = driver.find_elements(
             By.XPATH, "(//div[@id='jobDescriptionText'])")
         job_description.append(job_description.text)
-        print(job_description.text)
+        print(job_description)
     except:
         job_description.append("Not Found")
     try:
