@@ -8,6 +8,7 @@ import pandas as pd
 import time
 import json
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # from selenium.webdriver.common.keys import Keys
