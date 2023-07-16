@@ -12,6 +12,7 @@ from selenium.webdriver.common.by import By
 # from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import NoSuchElementException
+from urllib.parse import urlparse, parse_qs
 
 
 options = Options()
@@ -26,8 +27,28 @@ driver.set_window_size(1024, 768)
 driver.switch_to.window(driver.current_window_handle)
 driver.implicitly_wait(10)
 
+# baseUrl = [
+#     'https://www.linkedin.com/jobs/search?keywords=&location=Dhaka%2C%20Dhaka%2C%20Bangladesh&locationId=&geoId=103561184&f_TPR=r86400&distance=25&position=4&pageNum=0'
 
-driver.get('https://www.linkedin.com/jobs/search?keywords=&location=Dhaka%2C%20Dhaka%2C%20Bangladesh&geoId=103561184&trk=public_jobs_jobs-search-bar_search-submit&position=1&pageNum=0')
+# ]
+
+# url = baseUrl[0]
+
+# parsed_url = urlparse(url)
+# query_string = parsed_url.query
+
+# # Parse the query string and get the values as a dictionary
+# query_params = parse_qs(query_string)
+
+# # Convert the values to a string
+# query_string_values = {key: value[0] for key, value in query_params.items()}
+# query_string_as_string = str(query_string_values)
+
+location = 'United States'
+
+
+driver.get(
+    f'https://www.linkedin.com/jobs/search?keywords=&location=${location}&locationId=&geoId=&f_TPR=r86400&distance=25&position=4&pageNum=0')
 
 # You can set your own pause time. My laptop is a bit slow so I use 1 sec
 scroll_pause_time = 2
@@ -44,17 +65,16 @@ while i <= 2:
     # update scroll height each time after scrolled, as the scroll height can change after we scrolled
     # the page
 
-
     scroll_height = driver.execute_script("return document.body.scrollHeight;")
     # Break the loop when the height we need to scroll to is larger than the total scroll height
     if (screen_height) * i > scroll_height:
-      see_more = driver.find_element(
-        By.XPATH, "//button[@data-tracking-control-name='infinite-scroller_show-more']")
-      if (see_more.text == 'See more jobs'):
-        see_more.click()
-        time.sleep(2)
-        continue
-      break
+        see_more = driver.find_element(
+            By.XPATH, "//button[@data-tracking-control-name='infinite-scroller_show-more']")
+        if (see_more.text == 'See more jobs'):
+            see_more.click()
+            time.sleep(2)
+            continue
+        break
 
 
 links = []
@@ -68,11 +88,11 @@ try:
         entity_urn = element.get_attribute("data-entity-urn")
         job_id = entity_urn.split(":")[-1]
         # print(job_id)
-        url_template = "https://www.linkedin.com/jobs/search?location=Dhaka%2C%20Dhaka%2C%20Bangladesh&geoId=103561184&trk=public_jobs_jobs-search-bar_search-submit&position=23&pageNum=0&currentJobId={}"
-        url = url_template.format(job_id)
+        url = f'https://www.linkedin.com/jobs/search?location=&geoId=&f_TPR=r86400&distance=25&currentJobId={job_id}&position=4&pageNum=0'
+        # url = url_template.format(job_id)
         links.append(url)
         # print(links)
-        
+
 except:
     pass
 
@@ -99,6 +119,8 @@ company_names = []
 job_dates = []
 job_description = []
 apply_links = []
+job_levels = []
+
 i = 0
 for i in range(5):
     try:
@@ -122,28 +144,31 @@ for i in range(5):
             job_dates.append(driver.find_element(
                 By.XPATH, "//span[@class='posted-time-ago__text topcard__flavor--metadata']").text)
         except NoSuchElementException:
-            job_dates.append(driver.find_element( 
+            job_dates.append(driver.find_element(
                 By.XPATH, "//span[@class='posted-time-ago__text posted-time-ago__text--new topcard__flavor--metadata']").text)
         except:
             job_dates.append('None')
         apply_links.append(str(links[i]))
-        
-        job_description.append(driver.find_element( 
+
+        job_description.append(driver.find_element(
             By.XPATH, "(//div[@class='show-more-less-html__markup relative overflow-hidden'])").text)
-        types = []
-        type_job = driver.find_elements(
-            By.XPATH, "//span[@class='description__job-criteria-text description__job-criteria-text--criteria']")
-        for type in type_job:
-            types.append(type.text)
-        job_types.append(types[0] + ' ' + types[1])
+        
+        types = driver.find_elements(By.XPATH, "//span[@class='description__job-criteria-text description__job-criteria-text--criteria']")
+        job_types.append(types[1].text)
+        job_levels.append(types[0].text)
     except:
         pass
     time.sleep(2)
+    
 
-print(job_titles, job_types, company_names, job_locations,
-    job_dates, apply_links, job_description)
+driver.close()
+driver.quit()
 
-data = zip(job_titles, job_types, company_names, job_locations, job_dates, apply_links, job_description)
+print(job_titles, job_types, job_levels, company_names, job_locations,
+      job_dates, apply_links, job_description)
+
+data = zip(job_titles, job_types, job_levels, company_names, job_locations,
+           job_dates, apply_links, job_description)
 
 # Convert the zipped data to a list of dictionaries
 result = []
@@ -151,86 +176,51 @@ for item in data:
     job_data = {
         'job_title': item[0],
         'job_type': item[1],
-        'company_name': item[2],
-        'job_location': item[3],
-        'job_date': item[4],
-        'apply_link': item[5],
-        'job_description': item[6]
+        'job_level': item[2], # 'job_level': item[2] if item[2] else 'None
+        'company_name': item[3],
+        'job_location': item[4],
+        'job_date': item[5],
+        'apply_link': item[6],
+        'job_description': item[7]
     }
     result.append(job_data)
 
-# Convert the list of dictionaries to JSON
-# json_data = json.dumps(result)
+json_data = json.dumps(result)
 
-# # Print the JSON data
-# print(json_data)
-# with open("data2.json", "w") as f:
-#     f.write(json_data)
-
-
-
-
-
-# # Convert the list of dictionaries to a pandas DataFrame
-# df = pd.DataFrame(job_data,
-#                   columns=['job_title', 'job_types', 'company_name', 'job_location', 'job_date', 'apply_link', 'job_description'])
-
-# # convert json
-# json_data = df.to_json('data.json',orient='records', )
-# json to dict
-# data = json.loads(json_data)
-
+print(len(result))
 # # load into mongodb
 load_dotenv()
 MONGO_URL = os.getenv('MONGO_URL')
 # print(MONGO_URL)
 
 dbname = 'jobScraper'
-collectionname = 'linkedInJobs'
-
-# Set up a connection to MongoDB Atlas
+collectionname = 'linkedinjobs'
+MONGO_URL = os.environ['MONGO_URL']
 try:
     client = pymongo.MongoClient(MONGO_URL)
-    print("Connected successfully to MongoDB Atlas")
 except pymongo.errors.ConnectionFailure as e:
-    print("Could not connect to MongoDB Atlas: %s" % e)
+    print("Could not connect to MongoDB Atlas:", e)
 
 db = client[dbname]
 collection = db[collectionname]
 
-# # insert data into mongodb
-for record in result:
-    # Create a unique index for the job_title field
-    collection.create_index([('job_title', pymongo.ASCENDING)], unique=True)
-    # update = {'$set': record}
+    # Create indexes for multiple fields if they don't exist
+collection.create_index([('job_title', pymongo.ASCENDING)], unique=True)
+collection.create_index([('job_location', pymongo.ASCENDING)])
+collection.create_index([('company_name', pymongo.ASCENDING)])
 
-    # Try to update the document if it exists, otherwise insert it as a new document
-    try:
-        collection.insert_one(record)
-        print("Data inserted successfully.")
-    except pymongo.errors.DuplicateKeyError:
-        print("Data already exists in the collection. Skipping insertion.")
-    except Exception as e:
-        print("Error inserting data:", e)
-
-# # Print the JSON string
-# print(json_data)
-
-
-# # mail = 'devilshuvo12@gmail.com'
-# # password = 'devil91?'
-
-# # driver.find_element(By.XPATH, "(//input[@type='text'])").send_keys(mail)
-
-# # driver.find_element(
-# #     By.XPATH, "(//input[@type='password'])").send_keys(password)
-# # time.sleep(2)
-
-# # driver.find_element(By.XPATH,"//button[normalize-space()='Sign in']").click()
-
-# # driver.find_element(By.TAG_NAME,'body').send_keys(Keys.COMMAND + 't')
-# # driver.get('http://stackoverflow.com/')
+for job_data in result:
+        try:
+            collection.update_one(
+                {'job_title': job_data['job_title'], 'job_location': job_data['job_location'], 'company_name': job_data['company_name'], 'job_description': job_data['job_description'],
+                    'apply_link': job_data['apply_link'], 'job_type': job_data['job_type'], 'job_level': job_data['job_level'], 'source': 'LinkedIn'},
+                {'$set': {'job_date': job_data['job_date']}},
+                upsert=True
+            )
+            print("Data inserted/updated successfully.")
+        except pymongo.errors.DuplicateKeyError:
+            print("Data already exists in the collection. Skipping insertion.")
+        except Exception as e:
+            print("Error inserting/updating data:", e)
 
 
-time.sleep(1000)
-driver.close()
